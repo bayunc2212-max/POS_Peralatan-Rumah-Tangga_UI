@@ -31,7 +31,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-900 text-white mb-4">
             <StoreIcon className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-semibold text-stone-900">Toko EMA</h1>
+          <h1 className="text-xl font-semibold text-stone-900">Toko EMAA</h1>
           <p className="text-sm text-stone-500 mt-1">Masuk ke akun anda</p>
         </div>
 
