@@ -3,11 +3,12 @@ import api from "../services/api";
 import Modal from "../components/Modal";
 import Loading from "../components/Loading";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import type { Product } from "../types";
 import { Button, Input, Badge } from "../components/ui";
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, CloseIcon } from "../components/ui/Icons";
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, CloseIcon, HistoryIcon, PackagePlusIcon } from "../components/ui/Icons";
 
-const emptyForm = { nama_barang: "", stock: 0, harga_beli: 0, harga_jual: 0, satuan: "", gambar: "" };
+const emptyForm = { nama_barang: "", stock: 0, harga_beli: 0, harga_jual: 0, batas_harga_nego: 0, satuan: "", gambar: "" };
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,7 +18,11 @@ export default function Products() {
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [stockModal, setStockModal] = useState<Product | null>(null);
+  const [stockQty, setStockQty] = useState(0);
+  const [stockSaving, setStockSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +64,7 @@ export default function Products() {
       stock: p.stock,
       harga_beli: p.harga_beli,
       harga_jual: p.harga_jual,
+      batas_harga_nego: p.batas_harga_nego ?? p.harga_beli,
       satuan: p.satuan,
       gambar: p.gambar ?? "",
     });
@@ -68,6 +74,18 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.stock < 0) {
+      return toast.error("Stok tidak boleh minus");
+    }
+    if (form.harga_jual < form.harga_beli) {
+      return toast.error("Harga jual tidak boleh di bawah harga beli (modal)");
+    }
+    if (form.batas_harga_nego >= form.harga_jual) {
+      return toast.error("Batas harga nego harus di bawah harga jual");
+    }
+    if (form.batas_harga_nego < form.harga_beli) {
+      return toast.error("Batas harga nego tidak boleh di bawah harga beli");
+    }
     try {
       if (editId) {
         await api.put(`/products/${editId}`, form);
@@ -81,6 +99,9 @@ export default function Products() {
     } catch (err: any) {
       const msg = err.response?.data?.message;
       if (msg === "NAMA_BARANG_SUDAH_ADA") toast.error("Nama barang sudah ada");
+      else if (msg === "HARGA_JUAL_DI_BAWAH_MODAL") toast.error("Harga jual tidak boleh di bawah harga beli");
+      else if (msg === "BATAS_NEGO_INVALID") toast.error("Batas nego harus di antara harga beli dan harga jual");
+      else if (msg === "STOK_MINUS") toast.error("Stok tidak boleh minus");
       else toast.error("Gagal menyimpan barang");
     }
   };
@@ -92,7 +113,25 @@ export default function Products() {
       toast.success("Barang dihapus");
       fetchProducts();
     } catch {
-      toast.error("Gagal menghapus");
+      toast.error("Gagal menghapus (barang mungkin punya riwayat transaksi)");
+    }
+  };
+
+  const handleAddStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockModal) return;
+    if (!stockQty || stockQty <= 0) return toast.error("Jumlah stok harus lebih dari 0");
+    setStockSaving(true);
+    try {
+      await api.patch(`/products/${stockModal.id}/stock`, { tambah: stockQty });
+      toast.success(`Stok ${stockModal.nama_barang} bertambah ${stockQty}`);
+      setStockModal(null);
+      setStockQty(0);
+      fetchProducts();
+    } catch {
+      toast.error("Gagal menambah stok");
+    } finally {
+      setStockSaving(false);
     }
   };
 
@@ -103,17 +142,26 @@ export default function Products() {
   if (loading) return <Loading text="Memuat barang..." />;
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-5 animate-fade-in">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-stone-900">Barang</h1>
           <p className="text-sm text-stone-500 mt-0.5">
             {products.length} barang terdaftar
           </p>
         </div>
-        <Button icon={<PlusIcon className="w-4 h-4" />} onClick={openAdd}>
-          Tambah Barang
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            icon={<HistoryIcon className="w-4 h-4" />}
+            onClick={() => navigate("/riwayat")}
+          >
+            Riwayat Stok
+          </Button>
+          <Button icon={<PlusIcon className="w-4 h-4" />} onClick={openAdd}>
+            Tambah Barang
+          </Button>
+        </div>
       </div>
 
       <div className="relative max-w-xs">
@@ -123,11 +171,11 @@ export default function Products() {
           placeholder="Cari barang..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3.5 py-2 text-sm bg-white border border-stone-200 rounded-lg placeholder:text-stone-400 transition-all duration-150 focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-400/30"
+          className="w-full pl-9 pr-3.5 py-2 text-sm bg-white border border-stone-200 rounded-xl placeholder:text-stone-400 transition-all duration-150 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-400/30"
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200/70 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-200/70 shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full text-sm">
             <thead>
@@ -138,6 +186,7 @@ export default function Products() {
                 <th className="text-right px-5 py-3.5 text-xs font-medium text-stone-500 uppercase tracking-wider">Stok</th>
                 <th className="text-right px-5 py-3.5 text-xs font-medium text-stone-500 uppercase tracking-wider">Harga Beli</th>
                 <th className="text-right px-5 py-3.5 text-xs font-medium text-stone-500 uppercase tracking-wider">Harga Jual</th>
+                <th className="text-right px-5 py-3.5 text-xs font-medium text-stone-500 uppercase tracking-wider">Batas Nego</th>
                 <th className="text-center px-5 py-3.5 text-xs font-medium text-stone-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
@@ -162,8 +211,18 @@ export default function Products() {
                   </td>
                   <td className="px-5 py-3.5 text-right text-stone-700">Rp {p.harga_beli.toLocaleString("id-ID")}</td>
                   <td className="px-5 py-3.5 text-right font-medium text-stone-900">Rp {p.harga_jual.toLocaleString("id-ID")}</td>
+                  <td className="px-5 py-3.5 text-right text-orange-600 font-medium">
+                    Rp {(p.batas_harga_nego ?? p.harga_beli).toLocaleString("id-ID")}
+                  </td>
                   <td className="px-5 py-3.5 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => { setStockModal(p); setStockQty(0); }}
+                        className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                        title="Tambah Stok"
+                      >
+                        <PackagePlusIcon className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => openEdit(p)}
                         className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
@@ -184,7 +243,7 @@ export default function Products() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-stone-400">
+                  <td colSpan={8} className="text-center py-12 text-stone-400">
                     {search ? "Barang tidak ditemukan" : "Belum ada barang"}
                   </td>
                 </tr>
@@ -211,8 +270,10 @@ export default function Products() {
             <Input
               label="Stok"
               type="number"
+              min={0}
               value={form.stock}
               onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+              hint="Tidak boleh minus"
               required
             />
             <Input
@@ -226,8 +287,9 @@ export default function Products() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Harga Beli"
+              label="Harga Beli (Modal)"
               type="number"
+              min={0}
               value={form.harga_beli}
               onChange={(e) => setForm({ ...form, harga_beli: Number(e.target.value) })}
               required
@@ -235,11 +297,23 @@ export default function Products() {
             <Input
               label="Harga Jual"
               type="number"
+              min={form.harga_beli}
               value={form.harga_jual}
               onChange={(e) => setForm({ ...form, harga_jual: Number(e.target.value) })}
+              hint="Tidak boleh di bawah modal"
               required
             />
           </div>
+          <Input
+            label="Batas Harga Nego"
+            type="number"
+            min={form.harga_beli}
+            max={form.harga_jual - 1}
+            value={form.batas_harga_nego}
+            onChange={(e) => setForm({ ...form, batas_harga_nego: Number(e.target.value) })}
+            hint={`Kasir boleh menawar sampai batas ini (antara Rp ${form.harga_beli.toLocaleString("id-ID")} - ${form.harga_jual.toLocaleString("id-ID")})`}
+            required
+          />
           <div className="space-y-2">
             <label className="block text-sm font-medium text-stone-700">Gambar</label>
             <input
@@ -285,6 +359,37 @@ export default function Products() {
           <div className="flex gap-3 pt-2">
             <Button type="submit">{editId ? "Simpan" : "Tambah"}</Button>
             <Button type="button" variant="secondary" onClick={() => setModal(false)}>
+              Batal
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!stockModal}
+        onClose={() => setStockModal(null)}
+        title={`Tambah Stok: ${stockModal?.nama_barang ?? ""}`}
+      >
+        <form onSubmit={handleAddStock} className="space-y-4">
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-emerald-700">Stok saat ini</span>
+            <span className="text-lg font-bold text-emerald-700">{stockModal?.stock ?? 0}</span>
+          </div>
+          <Input
+            label="Jumlah Stok Ditambahkan"
+            type="number"
+            min={1}
+            value={stockQty}
+            onChange={(e) => setStockQty(Number(e.target.value))}
+            hint="Hanya menambah stok, data barang tidak berubah"
+            autoFocus
+            required
+          />
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" loading={stockSaving} icon={<PackagePlusIcon className="w-4 h-4" />}>
+              Tambah Stok
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setStockModal(null)}>
               Batal
             </Button>
           </div>

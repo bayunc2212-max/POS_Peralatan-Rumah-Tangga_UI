@@ -8,12 +8,14 @@ import Products from "./pages/Products";
 import POS from "./pages/POS";
 import Reports from "./pages/Reports";
 import Receipt from "./pages/Receipt";
+import Kasir from "./pages/Kasir";
+import Riwayat from "./pages/Riwayat";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 md:flex">
       <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 pt-14 md:pt-0 overflow-auto">{children}</main>
     </div>
   );
 }
@@ -63,6 +65,26 @@ export default function App() {
           <ProtectedRoute role="owner">
             <Layout>
               <Reports />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/kasir"
+        element={
+          <ProtectedRoute role="owner">
+            <Layout>
+              <Kasir />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/riwayat"
+        element={
+          <ProtectedRoute role="owner">
+            <Layout>
+              <Riwayat />
             </Layout>
           </ProtectedRoute>
         }

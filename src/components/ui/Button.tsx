@@ -12,7 +12,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-stone-900 text-white hover:bg-stone-800 active:bg-stone-700 shadow-sm",
+    "bg-gradient-to-r from-brand-600 to-sky-500 text-white hover:opacity-90 active:scale-[0.99] shadow-md shadow-brand-600/20",
   secondary:
     "bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 active:bg-stone-100 shadow-sm",
   ghost:
@@ -39,7 +39,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
